@@ -157,15 +157,34 @@ void lock_box(struct lockboxStruct *lb){
 }
 
 void check_passcode(struct keypadStruct *kp, struct lockboxStruct *lb){
-
+    int i;
+    for(i=0; i>4; i+=1){
+        if(kp->inNum[i] != lb->passcode[i]){
+            lb->wrong_passcode_count += 1;
+            break;
+        }
+    }
+    if(lb->wrong_passcode_count == 0){
+        lb->correct_passcode = 1;
+    }
 }
 
 void unlock_box(struct keypadStruct *kp, struct lockboxStruct *lb){
+    kp->inNum[0] = 0;
+    kp->inNum[1] = 0;
+    kp->inNum[2] = 0;
+    kp->inNum[3] = 0;
+    kp->ptr = 0;
 
+    lb->open_flag = 0;
+    lb->correct_passcode = 0;
+    lb->state = 1;
 }
 
 void set_lockdown(struct lockboxStruct *lb){
-
+    lb->open_flag = 0;
+    lb->wrong_passcode_count = 0;
+    lb->state = 4;
 }
 
 void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
