@@ -187,6 +187,18 @@ void set_lockdown(struct lockboxStruct *lb){
     lb->state = 4;
 }
 
+void display_Ld(struct keypadStruct *kp){
+    kp->inNum[0] = 15;
+    kp->inNum[1] = 14;
+    kp->inNum[2] = 13;
+    kp->inNum[3] = 15;
+}
+
+void return_to_lock(struct lockboxStruct *lb){
+    lb->count = 0;
+    lb->state = 3;
+}
+
 void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
     switch(lb->state){
         case 0:
@@ -236,7 +248,14 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
         }
         case 4:
         {
-
+            if(lb->count < 200000){
+                display_Ld(kp);
+                lb->count += 1;
+            }
+            else{
+                display_LOC(kp);
+                return_to_lock(lb);
+            }
         }
     }
 }
@@ -296,6 +315,9 @@ void keypad_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
                 if(kp->key != 0){
                     lb->cancel_flag = 1;
                 }
+            }
+            else if(lb->state == 3){
+                input_keypress(kp, digit);
             }
 
 
