@@ -191,7 +191,15 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
         }
         case 3:
         {
-
+            if(lb->open_flag == 1){
+                check_password(kp, lb);
+            }
+            if(lb->correct_passcode == 1){
+                unlock_box(kp, lb);
+            }
+            if(lb->wrong_passcode_count >= 5){
+                set_lockdown(lb);
+            }
         }
         case 4:
         {
