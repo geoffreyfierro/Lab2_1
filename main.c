@@ -156,6 +156,18 @@ void lock_box(struct lockboxStruct *lb){
     lb->count = 0;
 }
 
+void check_passcode(struct keypadStruct *kp, struct lockboxStruct *lb){
+
+}
+
+void unlock_box(struct keypadStruct *kp, struct lockboxStruct *lb){
+
+}
+
+void set_lockdown(struct lockboxStruct *lb){
+
+}
+
 void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
     switch(lb->state){
         case 0:
@@ -192,7 +204,7 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
         case 3:
         {
             if(lb->open_flag == 1){
-                check_password(kp, lb);
+                check_passcode(kp, lb);
             }
             if(lb->correct_passcode == 1){
                 unlock_box(kp, lb);
@@ -200,6 +212,8 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
             if(lb->wrong_passcode_count >= 5){
                 set_lockdown(lb);
             }
+            else
+                break;
         }
         case 4:
         {
