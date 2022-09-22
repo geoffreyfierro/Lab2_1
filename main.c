@@ -12,10 +12,10 @@ void selectLEDDigit(int k){
     P8->OUT = LEDDigit[3-k];
 }
 void outputSegments(int hexIndex){
-    unsigned int sseg_table[16]={0b11000000,0b11111001,0b10100100,0b10110000,
-                       0B10011001,0b10010010,0b010000010,0b11111000,
+    unsigned int sseg_table[20]={0b11000000,0b11111001,0b10100100,0b10110000,
+                       0b10011001,0b10010010,0b010000010,0b11111000,
                        0b10000000,0b10010000,0b10001000,0b10000011,
-                       0b11000110,0b10100001,0b11000111,0b11111111};
+                       0b11000110,0b10100001,0b11000111,0b11111111,0b11000000,0b10001100,0b10000110,0b10101011};
 
      P4->OUT = sseg_table[hexIndex];
 }
@@ -72,7 +72,7 @@ void main(void)
 	    //Set GPIO Pins for LED
 	    P5->DIR |= BIT0;
 
-	    struct keypadStruct kp = {0, {0,0,0,0}, 0, 0, 0, 0, 0, 0};
+	    struct keypadStruct kp = {0, {16,16,16,16}, 0, 0, 0, 0, 0, 0};
 	    struct lockboxStruct lb = {0, {0,0,0,0}, 0, 0, 0, 0, 0, 0};
 
 	    //main program loop
@@ -102,6 +102,14 @@ void main(void)
 	    }
 }
 
+void display0(struct keypadStruct *kp){
+    kp->inNum[0] = 16;
+    kp->inNum[1] = 16;
+    kp->inNum[2] = 16;
+    kp->inNum[3] = 16;
+    kp->ptr = 0;
+}
+
 void process_open_flag(struct lockboxStruct *lb){
     lb->state = 1;
     lb->open_flag = 0;
@@ -112,17 +120,19 @@ void process_lock_flag(struct keypadStruct *kp, struct lockboxStruct *lb){
     for(i=0; i<4; i+=1){
         lb->passcode[i] = kp->inNum[i];
     }
+
     lb->state = 2;
     lb->lock_flag = 0;
 }
 
 void energize_solenoid(struct lockboxStruct *lb){
-    P2->OUT = BIT5;
+    P2->OUT = ~BIT5;
     lb->count += 1;
 }
 
-void de_energize_solenoid(struct lockboxStruct *lb){
-    P2->OUT = ~BIT5;
+void de_energize_solenoid(struct keypadStruct *kp, struct lockboxStruct *lb){
+    P2->OUT = BIT5;
+    display0(kp);
     lb->count = 0;
     lb->state = 0;
 }
@@ -134,10 +144,13 @@ void flash_led(struct lockboxStruct *lb){
         P5->OUT = ~BIT0;
 }
 
-void check_cancel(struct lockboxStruct *lb){
+void check_cancel(struct keypadStruct *kp, struct lockboxStruct *lb){
     if(lb->cancel_flag == 1){
         lb->state = 0;
         lb->count = 0;
+        P5->OUT = BIT0;
+        display0(kp);
+        lb->cancel_flag = 0;
     }
     else{
         lb->count += 1;
@@ -157,27 +170,33 @@ void lock_box(struct lockboxStruct *lb){
 }
 
 void check_passcode(struct keypadStruct *kp, struct lockboxStruct *lb){
+    lb->open_flag = 0;
+    int temp_wrong_count = lb->wrong_passcode_count;
     int i;
-    for(i=0; i>4; i+=1){
+    for(i=0; i<4; i+=1){
         if(kp->inNum[i] != lb->passcode[i]){
             lb->wrong_passcode_count += 1;
+            display_LOC(kp);
+            kp->ptr = 0;
             break;
         }
     }
-    if(lb->wrong_passcode_count == 0){
+    if(lb->wrong_passcode_count == temp_wrong_count){
         lb->correct_passcode = 1;
     }
 }
 
-void unlock_box(struct keypadStruct *kp, struct lockboxStruct *lb){
+void display_open(struct keypadStruct *kp){
     kp->inNum[0] = 0;
-    kp->inNum[1] = 0;
-    kp->inNum[2] = 0;
-    kp->inNum[3] = 0;
-    kp->ptr = 0;
+    kp->inNum[1] = 17;
+    kp->inNum[2] = 18;
+    kp->inNum[3] = 19;
+}
 
-    lb->open_flag = 0;
+void unlock_box(struct keypadStruct *kp, struct lockboxStruct *lb){
+    display_open(kp);
     lb->correct_passcode = 0;
+    lb->wrong_passcode_count = 0;
     lb->state = 1;
 }
 
@@ -196,6 +215,7 @@ void display_Ld(struct keypadStruct *kp){
 
 void return_to_lock(struct lockboxStruct *lb){
     lb->count = 0;
+    lb->wrong_passcode_count = 0;
     lb->state = 3;
 }
 
@@ -205,31 +225,37 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
         {
             if(lb->open_flag == 1){
                 process_open_flag(lb);
+                break;
             }
             else if(lb->lock_flag == 1){
                 process_lock_flag(kp, lb);
+                break;
             }
             else
                 break;
         }
         case 1:
         {
-            if(lb->count < 5000)
+            if(lb->count < 30000){//30000
                 energize_solenoid(lb);
+                break;
+            }
             else{
-                de_energize_solenoid(lb);
+                de_energize_solenoid(kp, lb);
                 break;
             }
         }
         case 2:
         {
-            if(lb->count < 20000){
+            if(lb->count < 30000){//30000
                 flash_led(lb);
-                check_cancel(lb);
+                check_cancel(kp, lb);
+                break;
             }
             else{
                 display_LOC(kp);
                 lock_box(lb);
+                break;
             }
         }
         case 3:
@@ -239,16 +265,18 @@ void lockbox_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
             }
             if(lb->correct_passcode == 1){
                 unlock_box(kp, lb);
+                break;
             }
             if(lb->wrong_passcode_count >= 5){
                 set_lockdown(lb);
+                break;
             }
             else
                 break;
         }
         case 4:
         {
-            if(lb->count < 200000){
+            if(lb->count < 80000){
                 display_Ld(kp);
                 lb->count += 1;
             }
@@ -267,6 +295,14 @@ void input_keypress(struct keypadStruct *kp, int digit){
         kp->ptr=0;
     else
         kp->ptr+=1;
+}
+
+int full_input(struct keypadStruct *kp, int check_char){
+    if(kp->inNum[3] != check_char){
+        return 1;
+    }
+    else
+        return 0;
 }
 
 void keypad_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
@@ -304,10 +340,10 @@ void keypad_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
                 if(digit == 10){
                     lb->open_flag = 1;
                 }
-                else if(digit == 11){
+                else if(digit == 11 && full_input(kp,16) == 1){
                     lb->lock_flag = 1;
                 }
-                else{
+                else if(digit != 10 && digit != 11){
                     input_keypress(kp, digit);
                 }
             }
@@ -317,7 +353,12 @@ void keypad_fsm(struct keypadStruct *kp, struct lockboxStruct *lb){
                 }
             }
             else if(lb->state == 3){
-                input_keypress(kp, digit);
+                if(digit == 10 && full_input(kp,12) == 1){
+                    lb->open_flag = 1;
+                }
+                else if(digit !=10 && digit != 11){
+                    input_keypress(kp, digit);
+                }
             }
 
 
